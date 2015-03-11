@@ -1,6 +1,9 @@
 package com.example.microsoftproject;
 
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import android.app.ListActivity;
 import android.bluetooth.BluetoothAdapter;
@@ -11,6 +14,8 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -138,22 +143,29 @@ public class MainActivity extends ListActivity {
 	private class LeDeviceListAdapter extends BaseAdapter {
 
 		private ArrayList<BluetoothDevice> mLeDevices;
+		private ArrayList<String> mLeDevicesRssi;
 		private LayoutInflater mInflator;
 		
 		public LeDeviceListAdapter(){
 			super();
 			mLeDevices = new ArrayList<BluetoothDevice>();
+			mLeDevicesRssi = new ArrayList<String>();
 			mInflator = MainActivity.this.getLayoutInflater();
 		}
 		
-		public void addDevice(BluetoothDevice device) {
+		public void addDevice(BluetoothDevice device, String rssi) {
 			if(!mLeDevices.contains(device)){
 				mLeDevices.add(device);
+				mLeDevicesRssi.add(rssi);
 			}
 		}
 		
 		public BluetoothDevice getDevice(int position) {
 			return mLeDevices.get(position);
+		}
+		
+		public String getRSSI(int position){
+			return mLeDevicesRssi.get(position);
 		}
 		
 		 public void clear() {
@@ -193,6 +205,7 @@ public class MainActivity extends ListActivity {
 			}
 			
 			BluetoothDevice device = mLeDevices.get(position);
+			String rssi = mLeDevicesRssi.get(position);
             final String deviceName = device.getName();
             if (deviceName != null && deviceName.length() > 0)
                 viewHolder.deviceName.setText(deviceName);
@@ -200,6 +213,7 @@ public class MainActivity extends ListActivity {
                 viewHolder.deviceName.setText(R.string.unknown_device);
             
             viewHolder.deviceAddress.setText(device.getAddress());
+            viewHolder.deviceRssi.setText("rssi: " + rssi + " dbm");
          //   viewHolder.deviceRssi.setText();
             return convertView;
 			
@@ -211,7 +225,7 @@ public class MainActivity extends ListActivity {
 			new BluetoothAdapter.LeScanCallback() {
 				
 				@Override
-				public void onLeScan(final BluetoothDevice device, int rssi, byte[] scanRecord) {
+				public void onLeScan(final BluetoothDevice device, final int rssi, final byte[] scanRecord) {
 					// TODO Auto-generated method stub
 					
 					runOnUiThread(new Runnable(){
@@ -219,8 +233,10 @@ public class MainActivity extends ListActivity {
 						@Override
 						public void run() {
 							// TODO Auto-generated method stub
-							mLeDeviceListAdapter.addDevice(device);
+							mLeDeviceListAdapter.addDevice(device, String.valueOf(rssi));
 		                    mLeDeviceListAdapter.notifyDataSetChanged();
+		                    
+		                    
 						}});
 				}
 	};
@@ -230,4 +246,5 @@ public class MainActivity extends ListActivity {
 		TextView deviceAddress;
 		TextView deviceRssi;
 	}
+	
 }
