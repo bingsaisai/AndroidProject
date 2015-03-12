@@ -233,6 +233,11 @@ public class MainActivity extends ListActivity {
 						@Override
 						public void run() {
 							// TODO Auto-generated method stub
+							
+							System.out.println("ComleteName: " + AdvertisingData.getCompleteName(scanRecord));
+							System.out.println("Name: " + AdvertisingData.getName(scanRecord));
+							System.out.println("TxPower: " + AdvertisingData.getTxPowerLevel(scanRecord));
+							
 							mLeDeviceListAdapter.addDevice(device, String.valueOf(rssi));
 		                    mLeDeviceListAdapter.notifyDataSetChanged();
 		                    
