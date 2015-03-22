@@ -1,19 +1,31 @@
 package com.example.microsoftproject;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import android.app.ListActivity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
+import android.os.Parcelable;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -32,8 +44,12 @@ public class MainActivity extends ListActivity {
 	private boolean mScanning;
 	private Handler mHandler;
 	private LeDeviceListAdapter mLeDeviceListAdapter;
+	private Timer timer;
+	private TimerTask Ttask;
+	private int timercount = 0;
 	
-	private static final long SCAN_PERIOD = 10000;
+	private static final long TIMERSCAN_PERIOD = 10;     // the time period of timerTask 
+	private static final long SCAN_PERIOD = TIMERSCAN_PERIOD * 1000;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -56,13 +72,74 @@ public class MainActivity extends ListActivity {
 		final BluetoothManager bluetoothManager =
                 (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothAdapter = bluetoothManager.getAdapter();
-        
+       
         // Checks if Bluetooth is supported on the device.
-        if (mBluetoothAdapter == null) {
+  /*      if (mBluetoothAdapter == null) {
             Toast.makeText(this, R.string.ble_not_supported, Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
+        */
+        timer = new Timer();
+        
+        Ttask = new TimerTask(){
+
+			@Override
+			public void run() {
+				// TODO Auto-generated method stub
+				if(timercount == 0){
+				 
+			        if (!mLeDeviceListAdapter.isEmpty())
+			        	mLeDeviceListAdapter.clear();
+			        
+					scanLeDevice(true);
+				//	mBluetoothAdapter.startDiscovery();
+					System.out.println("------------> START: " + timercount);
+					
+				}
+				
+				if(timercount == TIMERSCAN_PERIOD){
+					timercount = 0;	
+					scanLeDevice(false);
+				//	mBluetoothAdapter.cancelDiscovery();
+					System.out.println("------------> STOP: " + timercount);
+				}else{
+					timercount++;
+				}
+			}};
+			
+			
+			
+		/*	
+			IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED);
+			BroadcastReceiver mReceiver = new BroadcastReceiver(){
+
+				@Override
+				public void onReceive(Context context, Intent intent) {
+					// TODO Auto-generated method stub
+					String action = intent.getAction();
+					System.out.println("------------> SCAN found device: ");
+					if(BluetoothDevice.ACTION_FOUND.equals(action)){
+						
+						BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+						
+						short rssi = intent.getExtras().getShort(BluetoothDevice.EXTRA_RSSI);
+						System.out.println("------------> SCAN found device: " + device.getName() + " | " + device.getAddress() + " | " + rssi);
+						
+						if(device.getBondState() != BluetoothDevice.BOND_BONDED){
+							
+						//	short rssi = intent.getExtras().getShort(BluetoothDevice.EXTRA_RSSI);
+						//	System.out.println("------------> SCAN found device: " + device.getName() + " | " + device.getAddress() + " | " + rssi);
+						//	
+						}
+						
+					}
+				}
+				
+			};
+			
+			registerReceiver(mReceiver, filter);
+        */
 	}
 		
 	 @Override
@@ -70,16 +147,16 @@ public class MainActivity extends ListActivity {
 	        super.onResume();
 	        // Ensures Bluetooth is enabled on the device.  If Bluetooth is not currently enabled,
 	        // fire an intent to display a dialog asking the user to grant permission to enable it.
-	        if (!mBluetoothAdapter.isEnabled()) {
+	   /*     if (!mBluetoothAdapter.isEnabled()) {
 	            if (!mBluetoothAdapter.isEnabled()) {
 	                Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
 	                startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
 	            }
-	        }
+	        } */
 	        // Initializes list view adapter.
 	        mLeDeviceListAdapter = new LeDeviceListAdapter();
 	        setListAdapter(mLeDeviceListAdapter);
-	        scanLeDevice(true);
+	       // scanLeDevice(true);
 	    }
 
 	@Override
@@ -106,11 +183,13 @@ public class MainActivity extends ListActivity {
 		
 		switch (item.getItemId()) {
          case R.id.menu_scan:
-             mLeDeviceListAdapter.clear();
-             scanLeDevice(true);
+          //   mLeDeviceListAdapter.clear();
+          //   scanLeDevice(true);
+            timer.schedule(Ttask, 0, 1000);
              break;
          case R.id.menu_stop:
-             scanLeDevice(false);
+          //   scanLeDevice(false);
+        	 timer.cancel();
              break;
      }
      return true;
@@ -170,6 +249,7 @@ public class MainActivity extends ListActivity {
 		
 		 public void clear() {
 	            mLeDevices.clear();
+	            mLeDevicesRssi.clear();
 	        }
 		
 		@Override
@@ -214,6 +294,13 @@ public class MainActivity extends ListActivity {
             
             viewHolder.deviceAddress.setText(device.getAddress());
             viewHolder.deviceRssi.setText("rssi: " + rssi + " dbm");
+            
+            try {
+				RecordIntoFile(device.getAddress(), deviceName, rssi);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} 
          //   viewHolder.deviceRssi.setText();
             return convertView;
 			
@@ -237,6 +324,7 @@ public class MainActivity extends ListActivity {
 							System.out.println("ComleteName: " + AdvertisingData.getCompleteName(scanRecord));
 							System.out.println("Name: " + AdvertisingData.getName(scanRecord));
 							System.out.println("TxPower: " + AdvertisingData.getTxPowerLevel(scanRecord));
+							System.out.println("RSSI: " + rssi);
 							
 							mLeDeviceListAdapter.addDevice(device, String.valueOf(rssi));
 		                    mLeDeviceListAdapter.notifyDataSetChanged();
@@ -246,10 +334,35 @@ public class MainActivity extends ListActivity {
 				}
 	};
 	
+	public static void RecordIntoFile(String deviceAddress, String deviceName, String rssi) throws IOException{
+		
+		File file = new File(Environment.getExternalStorageDirectory(), "BLERecord.txt");
+		if(!file.exists())
+			file.createNewFile();
+		
+		FileWriter fw = new FileWriter(file, true);
+		String data = getDateCurrentTimeZone(System.currentTimeMillis()) + "\t" + deviceAddress  + "\t" + deviceName  + "\t" + rssi + "\n";
+		fw.write(data);
+		fw.flush();
+		fw.close();
+	}
+	
+	public static String getDateCurrentTimeZone(long timestamp) {
+		try {
+			Calendar calendar = Calendar.getInstance();
+			long timeInMillis = timestamp;
+			calendar.setTimeInMillis(timeInMillis);
+			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+			Date currenTimeZone = (Date) calendar.getTime();
+			return sdf.format(currenTimeZone);
+		} catch (Exception e) {
+		}
+		return "";
+	}
+	
 	static class ViewHolder {
 		TextView deviceName;
 		TextView deviceAddress;
 		TextView deviceRssi;
 	}
-	
 }
